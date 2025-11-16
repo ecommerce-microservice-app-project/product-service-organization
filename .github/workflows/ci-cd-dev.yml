@@ -156,7 +156,7 @@ jobs:
     - name: Checkout infrastructure repository
       uses: actions/checkout@v4
       with:
-        repository: ${{ secrets.INFRA_REPO || format('{0}/ecommerce-infra', github.repository_owner) }}
+        repository: ${{ secrets.INFRA_REPO }}
         path: infra
         
     - name: Set up kubectl
@@ -226,7 +226,7 @@ jobs:
     - name: Checkout API Gateway Repository (para E2E tests)
       uses: actions/checkout@v4
       with:
-        repository: juanC773/ecommerce-api-gateway
+        repository: ecommerce-microservice-app-project/api-gateway-organization
         path: api-gateway
         ref: ${{ github.ref_name }}  # Usa la misma rama que disparó el pipeline (stage, dev, etc.)
         
@@ -270,7 +270,7 @@ jobs:
     - name: Checkout API Gateway Repository (para performance tests)
       uses: actions/checkout@v4
       with:
-        repository: juanC773/ecommerce-api-gateway
+        repository: ecommerce-microservice-app-project/api-gateway-organization
         path: api-gateway
         ref: ${{ github.ref_name }}  # Usa la misma rama que disparó el pipeline (stage, dev, etc.)
         
