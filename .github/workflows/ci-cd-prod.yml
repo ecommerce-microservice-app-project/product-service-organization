@@ -236,152 +236,15 @@ jobs:
       run: |
         npm install -g newman newman-reporter-html
         
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS_PROD }}
-        
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v2
-      with:
-        project_id: ${{ secrets.GCP_PROJECT_ID_PROD }}
-        
-    - name: Install gke-gcloud-auth-plugin
-      run: |
-        gcloud components install gke-gcloud-auth-plugin --quiet
-        
-    - name: Set up kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
-        
-    - name: Configure kubectl (GKE Cluster)
-      run: |
-        CLUSTER_NAME="${{ secrets.GKE_CLUSTER_NAME_PROD }}"
-        CLUSTER_LOCATION="${{ secrets.GKE_CLUSTER_LOCATION_PROD }}"
-        PROJECT_ID="${{ secrets.GCP_PROJECT_ID_PROD }}"
-        
-        echo "Connecting to GKE cluster: $CLUSTER_NAME in location: $CLUSTER_LOCATION"
-        gcloud container clusters get-credentials "$CLUSTER_NAME" \
-          --location "$CLUSTER_LOCATION" \
-          --project "$PROJECT_ID"
-        
-    - name: Get LoadBalancer IP for E2E tests
-      id: get_lb_ip_e2e
-      run: |
-        # Get LoadBalancer IP
-        LB_IP=""
-        for i in $(seq 1 30); do
-          LB_IP=$(kubectl get svc api-gateway -n ecommerce-prod -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
-          if [ -n "$LB_IP" ]; then
-            echo "LoadBalancer IP: $LB_IP"
-            echo "API_GATEWAY_URL=http://${LB_IP}:8080" >> $GITHUB_ENV
-            echo "lb_ip=${LB_IP}" >> $GITHUB_OUTPUT
-            break
-          fi
-          echo "Attempt $i/30: Waiting for LoadBalancer IP..."
-          sleep 10
-        done
-        
-        if [ -z "$LB_IP" ]; then
-          echo "Error: No se pudo obtener la IP del LoadBalancer después de 30 intentos"
-          exit 1
-        fi
-        
-    - name: Create production environment file
-      run: |
-        # Create environment-prod.json from environment-stage.json
-        cat > api-gateway/e2e-tests/postman/environment-prod.json << EOF
-        {
-          "id": "prod-environment-ecommerce",
-          "name": "E2E Tests - Production",
-          "values": [
-            {
-              "key": "baseUrl",
-              "value": "${{ env.API_GATEWAY_URL }}",
-              "type": "default",
-              "enabled": true
-            },
-            {
-              "key": "userId",
-              "value": "",
-              "type": "default",
-              "enabled": true
-            },
-            {
-              "key": "productId",
-              "value": "",
-              "type": "default",
-              "enabled": true
-            },
-            {
-              "key": "categoryId",
-              "value": "",
-              "type": "default",
-              "enabled": true
-            },
-            {
-              "key": "cartId",
-              "value": "",
-              "type": "default",
-              "enabled": true
-            },
-            {
-              "key": "orderId",
-              "value": "",
-              "type": "default",
-              "enabled": true
-            },
-            {
-              "key": "favouriteUserId",
-              "value": "",
-              "type": "default",
-              "enabled": true
-            },
-            {
-              "key": "favouriteProductId",
-              "value": "",
-              "type": "default",
-              "enabled": true
-            },
-            {
-              "key": "favouriteLikeDate",
-              "value": "",
-              "type": "default",
-              "enabled": true
-            },
-            {
-              "key": "paymentId",
-              "value": "",
-              "type": "default",
-              "enabled": true
-            },
-            {
-              "key": "shippingOrderId",
-              "value": "",
-              "type": "default",
-              "enabled": true
-            },
-            {
-              "key": "shippingProductId",
-              "value": "",
-              "type": "default",
-              "enabled": true
-            }
-          ],
-          "_postman_variable_scope": "environment"
-        }
-        EOF
-        
     - name: Wait for services to be ready
       run: |
-        echo "Esperando 60 segundos para que todos los servicios estén listos..."
-        sleep 60
+        echo "Esperando 30 segundos para que todos los servicios estén listos..."
+        sleep 30
         
     - name: Run E2E Tests
       run: |
         newman run api-gateway/e2e-tests/postman/e2e-tests.postman_collection.json \
-          --environment api-gateway/e2e-tests/postman/environment-prod.json \
+          --environment api-gateway/e2e-tests/postman/environment-stage.json \
           --reporters cli,html,json \
           --reporter-html-export e2e-report.html \
           --reporter-json-export e2e-results.json \
@@ -422,68 +285,16 @@ jobs:
         cd api-gateway/performance-tests
         pip install -r requirements.txt
         
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS_PROD }}
-        
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v2
-      with:
-        project_id: ${{ secrets.GCP_PROJECT_ID_PROD }}
-        
-    - name: Install gke-gcloud-auth-plugin
-      run: |
-        gcloud components install gke-gcloud-auth-plugin --quiet
-        
-    - name: Set up kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
-        
-    - name: Configure kubectl (GKE Cluster)
-      run: |
-        CLUSTER_NAME="${{ secrets.GKE_CLUSTER_NAME_PROD }}"
-        CLUSTER_LOCATION="${{ secrets.GKE_CLUSTER_LOCATION_PROD }}"
-        PROJECT_ID="${{ secrets.GCP_PROJECT_ID_PROD }}"
-        
-        echo "Connecting to GKE cluster: $CLUSTER_NAME in location: $CLUSTER_LOCATION"
-        gcloud container clusters get-credentials "$CLUSTER_NAME" \
-          --location "$CLUSTER_LOCATION" \
-          --project "$PROJECT_ID"
-        
-    - name: Get LoadBalancer IP for Locust tests
-      id: get_lb_ip_locust
-      run: |
-        # Get LoadBalancer IP
-        LB_IP=""
-        for i in $(seq 1 30); do
-          LB_IP=$(kubectl get svc api-gateway -n ecommerce-prod -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
-          if [ -n "$LB_IP" ]; then
-            echo "LoadBalancer IP: $LB_IP"
-            echo "API_GATEWAY_URL=http://${LB_IP}:8080" >> $GITHUB_ENV
-            echo "lb_ip=${LB_IP}" >> $GITHUB_OUTPUT
-            break
-          fi
-          echo "Attempt $i/30: Waiting for LoadBalancer IP..."
-          sleep 10
-        done
-        
-        if [ -z "$LB_IP" ]; then
-          echo "Error: No se pudo obtener la IP del LoadBalancer después de 30 intentos"
-          exit 1
-        fi
-        
     - name: Wait for services to be ready
       run: |
-        echo "Esperando 60 segundos para que todos los servicios estén listos..."
-        sleep 60
+        echo "Esperando 30 segundos para que todos los servicios estén listos..."
+        sleep 30
         
     - name: Run Performance Tests
       run: |
         cd api-gateway/performance-tests
         locust -f locustfile.py \
-          --host=${{ env.API_GATEWAY_URL }} \
+          --host=http://130.213.180.94:8080 \
           --users=50 \
           --spawn-rate=5 \
           --run-time=2m \
