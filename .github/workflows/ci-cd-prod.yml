@@ -17,6 +17,7 @@ env:
   SERVICE_NAME: product-service
   KUBERNETES_NAMESPACE: ecommerce-prod
   IMAGE_TAG: prod-0.1.0
+  API_GATEWAY_STAGE_URL: ${{ secrets.API_GATEWAY_STAGE_URL || 'http://130.213.254.34:8080' }}
 
 jobs:
   build-and-test:
@@ -300,7 +301,7 @@ jobs:
       run: |
         cd api-gateway/performance-tests
         locust -f locustfile.py \
-          --host=http://130.213.180.94:8080 \
+          --host=${{ env.API_GATEWAY_STAGE_URL }} \
           --users=50 \
           --spawn-rate=5 \
           --run-time=2m \
