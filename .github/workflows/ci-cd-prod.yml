@@ -444,7 +444,7 @@ jobs:
 
   release-notes:
     name: Generate Release Notes
-    needs: deploy
+    needs: [deploy, e2e-tests, performance-tests]
     runs-on: ubuntu-latest
     if: |
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
