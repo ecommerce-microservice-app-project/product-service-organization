@@ -236,27 +236,57 @@ jobs:
       run: |
         npm install -g newman newman-reporter-html
         
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_PROD }}
+        
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: ${{ secrets.GCP_PROJECT_ID_PROD }}
+        
+    - name: Install gke-gcloud-auth-plugin
+      run: |
+        gcloud components install gke-gcloud-auth-plugin --quiet
+        
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+        
+    - name: Configure kubectl (GKE Cluster)
+      run: |
+        CLUSTER_NAME="${{ secrets.GKE_CLUSTER_NAME_PROD }}"
+        CLUSTER_LOCATION="${{ secrets.GKE_CLUSTER_LOCATION_PROD }}"
+        PROJECT_ID="${{ secrets.GCP_PROJECT_ID_PROD }}"
+        
+        echo "Connecting to GKE cluster: $CLUSTER_NAME in location: $CLUSTER_LOCATION"
+        gcloud container clusters get-credentials "$CLUSTER_NAME" \
+          --location "$CLUSTER_LOCATION" \
+          --project "$PROJECT_ID"
+        
     - name: Get LoadBalancer IP for E2E tests
       id: get_lb_ip_e2e
       run: |
-        # Authenticate to GCP
-        echo "${{ secrets.GCP_CREDENTIALS_PROD }}" > /tmp/gcp-key.json
-        gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
-        gcloud config set project ${{ secrets.GCP_PROJECT_ID_PROD }}
-        
-        # Get cluster credentials
-        gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER_NAME_PROD }} \
-          --location ${{ secrets.GKE_CLUSTER_LOCATION_PROD }} \
-          --project ${{ secrets.GCP_PROJECT_ID_PROD }}
-        
         # Get LoadBalancer IP
-        LB_IP=$(kubectl get svc api-gateway -n ecommerce-prod -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+        LB_IP=""
+        for i in $(seq 1 30); do
+          LB_IP=$(kubectl get svc api-gateway -n ecommerce-prod -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+          if [ -n "$LB_IP" ]; then
+            echo "LoadBalancer IP: $LB_IP"
+            echo "API_GATEWAY_URL=http://${LB_IP}:8080" >> $GITHUB_ENV
+            echo "lb_ip=${LB_IP}" >> $GITHUB_OUTPUT
+            break
+          fi
+          echo "Attempt $i/30: Waiting for LoadBalancer IP..."
+          sleep 10
+        done
+        
         if [ -z "$LB_IP" ]; then
-          echo "Error: No se pudo obtener la IP del LoadBalancer"
+          echo "Error: No se pudo obtener la IP del LoadBalancer después de 30 intentos"
           exit 1
         fi
-        echo "LoadBalancer IP: $LB_IP"
-        echo "API_GATEWAY_URL=http://${LB_IP}:8080" >> $GITHUB_ENV
         
     - name: Create production environment file
       run: |
@@ -392,27 +422,57 @@ jobs:
         cd api-gateway/performance-tests
         pip install -r requirements.txt
         
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS_PROD }}
+        
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: ${{ secrets.GCP_PROJECT_ID_PROD }}
+        
+    - name: Install gke-gcloud-auth-plugin
+      run: |
+        gcloud components install gke-gcloud-auth-plugin --quiet
+        
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+        
+    - name: Configure kubectl (GKE Cluster)
+      run: |
+        CLUSTER_NAME="${{ secrets.GKE_CLUSTER_NAME_PROD }}"
+        CLUSTER_LOCATION="${{ secrets.GKE_CLUSTER_LOCATION_PROD }}"
+        PROJECT_ID="${{ secrets.GCP_PROJECT_ID_PROD }}"
+        
+        echo "Connecting to GKE cluster: $CLUSTER_NAME in location: $CLUSTER_LOCATION"
+        gcloud container clusters get-credentials "$CLUSTER_NAME" \
+          --location "$CLUSTER_LOCATION" \
+          --project "$PROJECT_ID"
+        
     - name: Get LoadBalancer IP for Locust tests
       id: get_lb_ip_locust
       run: |
-        # Authenticate to GCP
-        echo "${{ secrets.GCP_CREDENTIALS_PROD }}" > /tmp/gcp-key.json
-        gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
-        gcloud config set project ${{ secrets.GCP_PROJECT_ID_PROD }}
-        
-        # Get cluster credentials
-        gcloud container clusters get-credentials ${{ secrets.GKE_CLUSTER_NAME_PROD }} \
-          --location ${{ secrets.GKE_CLUSTER_LOCATION_PROD }} \
-          --project ${{ secrets.GCP_PROJECT_ID_PROD }}
-        
         # Get LoadBalancer IP
-        LB_IP=$(kubectl get svc api-gateway -n ecommerce-prod -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+        LB_IP=""
+        for i in $(seq 1 30); do
+          LB_IP=$(kubectl get svc api-gateway -n ecommerce-prod -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+          if [ -n "$LB_IP" ]; then
+            echo "LoadBalancer IP: $LB_IP"
+            echo "API_GATEWAY_URL=http://${LB_IP}:8080" >> $GITHUB_ENV
+            echo "lb_ip=${LB_IP}" >> $GITHUB_OUTPUT
+            break
+          fi
+          echo "Attempt $i/30: Waiting for LoadBalancer IP..."
+          sleep 10
+        done
+        
         if [ -z "$LB_IP" ]; then
-          echo "Error: No se pudo obtener la IP del LoadBalancer"
+          echo "Error: No se pudo obtener la IP del LoadBalancer después de 30 intentos"
           exit 1
         fi
-        echo "LoadBalancer IP: $LB_IP"
-        echo "API_GATEWAY_URL=http://${LB_IP}:8080" >> $GITHUB_ENV
         
     - name: Wait for services to be ready
       run: |
