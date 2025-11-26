@@ -1,6 +1,6 @@
-# ecommerce-product-service
+# Product Service
 
-Product Service para sistema de ecommerce.
+Product Service para sistema de ecommerce. Gestiona productos y categorías del catálogo.
 
 ## Características
 
@@ -8,42 +8,77 @@ Product Service para sistema de ecommerce.
 - Base de datos: H2 (dev) / MySQL (stage/prod)
 - Service Discovery: Eureka Client
 - Actuator para health checks
-- **Soft Delete:** Los productos no se eliminan físicamente
-- **Categorías Reservadas:** "Deleted" y "No category" protegidas
-- **Validaciones:** Campos requeridos en productos
+- Soft Delete: Los productos no se eliminan físicamente
+- Categorías Reservadas: "Deleted" y "No category" protegidas del sistema
+- Validaciones: Campos requeridos en productos
+- Migración Automática: Al eliminar categoría, productos se mueven a "No category"
 
 ## Endpoints
 
-```
-GET    /product-service/api/products       - Listar productos (sin eliminados)
-GET    /product-service/api/products/{id}  - Obtener producto (sin eliminados)
-POST   /product-service/api/products       - Crear producto
-PUT    /product-service/api/products       - Actualizar producto
-DELETE /product-service/api/products/{id}  - Soft delete de producto
+Prefijo: `/product-service`
 
-GET    /product-service/api/categories     - Listar categorías (sin reservadas)
-GET    /product-service/api/categories/{id}- Obtener categoría (sin reservadas)
-POST   /product-service/api/categories     - Crear categoría
-PUT    /product-service/api/categories     - Actualizar categoría
-DELETE /product-service/api/categories/{id}- Eliminar categoría (migra productos)
+### Product API
+
+```
+GET    /api/products              - Listar productos (sin eliminados)
+GET    /api/products/{id}        - Obtener producto por ID (sin eliminados)
+POST   /api/products              - Crear producto
+PUT    /api/products              - Actualizar producto
+DELETE /api/products/{id}        - Soft delete de producto
+```
+
+**Ejemplo de payload para crear producto:**
+
+```json
+{
+  "productTitle": "Producto Ejemplo",
+  "imageUrl": "https://example.com/image.jpg",
+  "sku": "SKU-001",
+  "priceUnit": 99.99,
+  "quantity": 10,
+  "category": {
+    "categoryId": 1
+  }
+}
+```
+
+### Category API
+
+```
+GET    /api/categories            - Listar categorías (sin reservadas)
+GET    /api/categories/{id}      - Obtener categoría por ID (sin reservadas)
+POST   /api/categories            - Crear categoría
+PUT    /api/categories            - Actualizar categoría
+DELETE /api/categories/{id}      - Eliminar categoría (migra productos a "No category")
+```
+
+**Ejemplo de payload para crear categoría:**
+
+```json
+{
+  "categoryTitle": "Electrónica",
+  "imageUrl": "https://example.com/category.jpg"
+}
 ```
 
 ## Testing
 
-### Unit Tests (21) ✅
-- ProductServiceImpl: 10 tests
-- CategoryServiceImpl: 11 tests
+### Unit Tests
 
-### Integration Tests (19) ✅
-- ProductServiceIntegrationTest: 10 tests
-- CategoryServiceIntegrationTest: 8 tests
+El servicio incluye pruebas unitarias para validar la lógica de negocio de productos y categorías:
 
-### Helper & Exception Tests (17) ✅
-- ProductMappingHelper: 5 tests
-- CategoryMappingHelper: 6 tests
-- ApiExceptionHandler: 6 tests
+- ProductServiceImpl: Tests de lógica de negocio de productos
+- CategoryServiceImpl: Tests de lógica de negocio de categorías
+- ProductMappingHelper: Tests de mapeo de entidades de producto
+- CategoryMappingHelper: Tests de mapeo de entidades de categoría
+- ApiExceptionHandler: Tests de manejo de excepciones
 
-**Total: 57 tests - Todos pasando ✅**
+### Integration Tests
+
+El servicio incluye pruebas de integración para validar la comunicación con la base de datos y los endpoints REST:
+
+- ProductServiceIntegrationTest: Tests de integración de endpoints REST de productos
+- CategoryServiceIntegrationTest: Tests de integración de endpoints REST de categorías
 
 ```bash
 ./mvnw test
@@ -62,23 +97,60 @@ java -jar target/product-service-v0.1.0.jar
 
 Service corre en: `http://localhost:8500/product-service`
 
-## Pruebas en Postman
+## Configuración
 
-Ver `POSTMAN_TESTS.md` para guía completa de pruebas o importar `ProductService.postman_collection.json`
+### Service Discovery
 
-### Endpoints Críticos a Probar:
+El servicio se registra automáticamente en Eureka Server con el nombre `PRODUCT-SERVICE`.
 
-1. **GET** `/api/categories` → Debe mostrar SOLO 3 categorías (sin Deleted/No category)
-2. **GET** `/api/products` → Debe mostrar productos sin eliminados
-3. **DELETE** `/api/products/1` → Soft delete (producto ya no aparece en lista)
-4. **DELETE** `/api/categories/2` → Migra productos a "No category"
-5. **DELETE** `/api/categories/5` → Debe fallar (categoría reservada)
+### Health Checks
+
+El servicio expone endpoints de health check a través de Spring Boot Actuator:
+
+```
+GET /product-service/actuator/health
+```
 
 ## Funcionalidades Implementadas
 
-✅ **Soft Delete:** Los productos eliminados se mueven a categoría "Deleted"  
-✅ **Categorías Reservadas:** "Deleted" y "No category" protegidas del sistema  
-✅ **Migración Automática:** Al eliminar categoría, productos → "No category"  
-✅ **Validaciones:** Campos requeridos en productos  
-✅ **Queries Personalizados:** Exclusión de eliminados/reservados  
-...
+- Gestión completa de productos (CRUD)
+- Gestión completa de categorías (CRUD)
+- Soft Delete: Los productos eliminados se mueven a categoría "Deleted" en lugar de eliminarse físicamente
+- Categorías Reservadas: "Deleted" y "No category" están protegidas del sistema y no pueden ser eliminadas o modificadas
+- Migración Automática: Al eliminar una categoría, todos los productos asociados se mueven automáticamente a "No category"
+- Validaciones: Campos requeridos en productos (productTitle, sku, priceUnit, quantity, category)
+- Queries Personalizados: Exclusión automática de productos eliminados y categorías reservadas en las consultas
+- Manejo de excepciones personalizado
+
+## Notas Importantes
+
+### Soft Delete
+
+- Los productos no se eliminan físicamente de la base de datos
+- Al eliminar un producto, se mueve a la categoría "Deleted"
+- Los productos en categoría "Deleted" no aparecen en las consultas normales (GET /api/products)
+- Esto permite mantener el historial de productos eliminados
+
+### Categorías Reservadas
+
+- "Deleted": Categoría del sistema para productos eliminados (soft delete)
+- "No category": Categoría por defecto para productos sin categoría o cuando se elimina una categoría
+- Estas categorías están protegidas y no pueden ser:
+  - Eliminadas
+  - Modificadas
+  - Listadas en las consultas normales (GET /api/categories)
+
+### Migración Automática
+
+- Cuando se elimina una categoría que tiene productos asociados, todos los productos se mueven automáticamente a "No category"
+- Esto evita que los productos queden huérfanos sin categoría
+- La eliminación de categoría solo es posible si no es una categoría reservada
+
+### Campos Requeridos
+
+Los siguientes campos son obligatorios al crear o actualizar un producto:
+- `productTitle`: Título del producto
+- `sku`: Código SKU único del producto
+- `priceUnit`: Precio unitario del producto
+- `quantity`: Cantidad disponible en inventario
+- `category`: Objeto categoría con `categoryId`
