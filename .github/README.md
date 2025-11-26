@@ -1,4 +1,4 @@
-# GitHub Actions para Product Service
+# GitHub Actions para Product Service.
 
 Este directorio contiene los workflows de CI/CD específicos para el Product Service.
 
